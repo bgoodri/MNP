@@ -8,13 +8,21 @@ Nethvote$educ <- as.factor(round(Nethvote$educ))
 Nethvote$age <- as.factor(Nethvote$age)
 
 X <- model.matrix(~ relig + class + income  + educ + age + urban, data = Nethvote)
-Z <- model.matrix(~ (distCDA + distD66 + distPvdA + distVVD) : vote - 1, data = Nethvote)
-Z <- matrix(0, nrow(Z), 0)
-data_list <- list(J = nlevels(Nethvote$vote), N = nrow(Nethvote), K = ncol(X), Q = ncol(Z),
-                  P = ncol(Z), Z = Z, X = X, y = as.integer(Nethvote$vote), eta = 1 + ncol(X) / 2)
+Z <- with(Nethvote, cbind(distCDA, distD66, distPvdA, distVVD))
+Z <- Z[,-4] - rowMeans(Z)
+J <- nlevels(Nethvote$vote)
+N <- nrow(Nethvote)
+K <- ncol(X)
+Q <- 1
+y <- as.integer(Nethvote$vote)
+eta <- 1 + (K + Q) / 2
+data_list <- list(J = J, N = N, K = K, Q = Q,
+                  Z = Z, X = X, y = y, eta = eta)
+stan_rdump(c("J", "N", "K", "Q", "Z", "X", "y", "eta"), file = "sMNP.data.R")
+
 folder<-getwd()
 fileUrl<-"https://raw.githubusercontent.com/vardakism/MNP/master/code/codeStan/sMNP.stan"
-download.file(fileUrl,destfile=paste(folder,"sMNP.stan",sep="/")) #maybe method="curl" if user in Mac OS
+download.file(fileUrl,destfile=paste(folder,"sMNP.stan",sep="/"),method="curl")
 
 fit <- stan("sMNP.stan", data = data_list, init_r = 0.1, chains = 1,
             pars = c("gamma", "beta", "beta_J", "eff_indep", "Sigma"), test_grad = TRUE)
